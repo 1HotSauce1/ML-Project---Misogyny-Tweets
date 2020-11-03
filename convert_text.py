@@ -1,7 +1,8 @@
 import csv
-import numpy as np
 import string
 from emoji import UNICODE_EMOJI
+from nltk.tokenize import TweetTokenizer
+from collections import Counter
 
 
 # 1. Read from csv file.
@@ -10,9 +11,14 @@ from emoji import UNICODE_EMOJI
 # 3. Convert from string array to dictionary.
 
 # 1.
-def read_data(cvs_file):
+def read_data(csv_file):
+    """
+    Function that reads data from csv files.
+    :param csv_file: Name of the csv file that contains the data
+    :return: data_set(list) A list containing all the data from the file
+    """
     data_set = []
-    with open(cvs_file, newline='', encoding='utf-8') as file:
+    with open(csv_file, newline='', encoding='utf-8') as file:
         reader = csv.reader(file)
         for row in reader:
             data_set.append(row)
@@ -37,48 +43,95 @@ def is_number(s):
 
 
 # 2.
-# Get rid of:
-# - name handles (start with @)
-# - hashtags
-# - links (start with https)
-# - punctuation marks
-# - numbers
-# - emojis
-# - words with 3 or less letters
 def tweet_filter(word):
-    if ('https' not in word and '@' not in word and '#' not in word and is_number(word) is not True
+    """
+    Function that filters strings by getting rid of: hashtags, links, punctuation marks,
+        numbers, emojis and words with 3 or more of the same letter in a row (italian grammar)
+    :param word: Word that needs to be filtered
+    :return: True/False(boolean) -> If the word passes or not the filter
+    """
+    if ('https' not in word and '#' not in word and '@' not in word and is_number(word) is not True
             and word not in list(string.printable) and word not in UNICODE_EMOJI and len(word) > 3):
         return True
     return False
 
 
-def filter_data(data_set):
-    string_list = [x[1].split() for x in data_set]
-    translator = str.maketrans('', '', string.punctuation)
+def tokenize(data_set):
+    tknzr = TweetTokenizer(reduce_len=True)
+    tokens = [tknzr.tokenize(x[1].lower()) for x in data_set]
 
-    for i in range(0, len(string_list)):
-        string_list[i] = [x.translate(translator).lower() for x in string_list[i] if tweet_filter(x)]
-    return string_list
+    for i in range(0, len(tokens)):
+        tokens[i] = [x for x in tokens[i] if tweet_filter(x)]
+
+    return tokens
 
 
 def get_labels(data_set):
+    """
+    Function that gets the labels from prereaded data from a csv file
+    :param data_set: Data from a csv file
+    :return: labels(list) The labels that tell if a tweet is mosogynistic or not
+    """
     labels = [x[2] for x in data_set]
     return labels
 
 
 # 3.
-def lists_union(string_data):
-    union = list(set(string_data[0]) | set(string_data[1]))
-    for i in range(2, len(string_data)):
-        union = list(set(union) | set(string_data[i]))
-    return union
+def get_corpus_vocabulary(tokens):
+    counter = Counter()
+    for tok in tokens:
+        counter.update(set(tok))
+
+    return counter.most_common(1000)
 
 
-def dictionary(string_data, union):
-    dictionar = []
-    for i in range(0, len(string_data)):
-        dictionar.append(dict.fromkeys(union, 0))
-        for j in range(0, len(string_data[i])):
-            if string_data[i][j] in dictionar[i]:
-                return True
-    return dictionar
+def corpus_to_bow(tokens, corpus):
+    corpus = dict(corpus)
+    bow = [dict.fromkeys(corpus, 0) for i in range(0, len(tokens))]
+
+    for i in range(0, len(tokens)):
+        for j in tokens[i]:
+            if j in bow[i]:
+                bow[i][j] += 1
+    return bow
+
+
+def bow_to_frequency(bow):
+    frequency = [list(x.values()) for x in bow]
+    return frequency
+
+
+# Absolute sum of elements
+def abs_sum(frequency):
+    linearized = []
+    for elem in frequency:
+        linearized.append([x / sum(elem) if x > 0 else 0 for x in elem])
+    return linearized
+
+
+def euclid_lin(frequency):
+    linearized = []
+    for elem in frequency:
+        linearized.append([x / euclid_norm(elem)if x > 0 else 0 for x in elem])
+    return linearized
+
+
+def euclid_norm(v):
+    suma = 0
+    for i in v:
+        suma += i**2
+    return suma
+
+
+#####
+def write_to_csv(labels, file_name):
+    with open(file_name, 'w', newline='') as csvfile:
+        fieldnames = ['id', 'label']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+
+        idx = 5001
+        for i in labels:
+            writer.writerow({'id': idx, 'label': i})
+            idx += 1
+

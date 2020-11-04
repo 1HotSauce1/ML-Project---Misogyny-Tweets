@@ -3,6 +3,7 @@ import string
 from emoji import UNICODE_EMOJI
 from nltk.tokenize import TweetTokenizer
 from collections import Counter
+from sklearn.preprocessing import normalize
 
 
 # 1. Read from csv file.
@@ -82,7 +83,7 @@ def get_corpus_vocabulary(tokens):
     for tok in tokens:
         counter.update(set(tok))
 
-    return counter.most_common(1000)
+    return counter.most_common(250)
 
 
 def corpus_to_bow(tokens, corpus):
@@ -112,14 +113,14 @@ def abs_sum(frequency):
 def euclid_lin(frequency):
     linearized = []
     for elem in frequency:
-        linearized.append([x / euclid_norm(elem)if x > 0 else 0 for x in elem])
+        linearized.append([x / euclid_norm(elem) if x > 0 else 0 for x in elem])
     return linearized
 
 
 def euclid_norm(v):
     suma = 0
     for i in v:
-        suma += i**2
+        suma += i ** 2
     return suma
 
 
@@ -134,4 +135,3 @@ def write_to_csv(labels, file_name):
         for i in labels:
             writer.writerow({'id': idx, 'label': i})
             idx += 1
-
